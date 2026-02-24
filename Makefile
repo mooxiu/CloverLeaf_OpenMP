@@ -62,6 +62,12 @@ ifndef COMPILER
   MESSAGE=select a compiler to compile in OpenMP, e.g. make COMPILER=INTEL
 endif
 
+PWD=$(shell pwd)
+LLVM_BUILD=$(PWD)/../llvm-project/build
+OMP_INCS=-I$(LLVM_BUILD)/runtimes/runtimes-bins/openmp/runtime/src 
+OMP_LIBS=-L$(LLVM_BUILD)/runtimes/runtimes-bins/openmp/runtime/src \
+  			-L$(LLVM_BUILD)/build/lib
+
 OMP_INTEL     = -openmp
 OMP_SUN       = -xopenmp=parallel -vpara
 OMP_GNU       = -fopenmp
@@ -70,6 +76,11 @@ OMP_PGI       = -mp=nonuma
 OMP_PATHSCALE = -mp
 OMP_XL        = -qsmp=omp -qthreaded
 OMP_LLVM 			= -fopenmp -fopenmp-version=60
+OMP_LLVM_GPU 	= -fopenmp -fopenmp-version=60 \
+								-fopenmp-targets=nvptx64-nvidia-cuda --offload-arch=sm_80 \
+								-lomptarget  \
+								$(OMP_INCS) \
+								$(OMP_LIBS)
 OMP=$(OMP_$(COMPILER))
 
 FLAGS_INTEL     = -O3 -no-prec-div
@@ -79,7 +90,8 @@ FLAGS_CRAY      = -em -ra -h acc_model=fast_addr:no_deep_copy:auto_async_all
 FLAGS_PGI       = -fastsse -Mipa=fast -Mlist
 FLAGS_PATHSCALE = -O3
 FLAGS_XL        = -O5 -qipa=partition=large -g -qfullpath -Q -qsigtrap -qextname=flush:ideal_gas_kernel_c:viscosity_kernel_c:pdv_kernel_c:revert_kernel_c:accelerate_kernel_c:flux_calc_kernel_c:advec_cell_kernel_c:advec_mom_kernel_c:reset_field_kernel_c:timer_c:unpack_top_bottom_buffers_c:pack_top_bottom_buffers_c:unpack_left_right_buffers_c:pack_left_right_buffers_c:field_summary_kernel_c:update_halo_kernel_c:generate_chunk_kernel_c:initialise_chunk_kernel_c:calc_dt_kernel_c:clover_unpack_message_bottom_c:clover_pack_message_bottom_c:clover_unpack_message_top_c:clover_pack_message_top_c:clover_unpack_message_right_c:clover_pack_message_right_c:clover_unpack_message_left_c:clover_pack_message_left_c -qlistopt -qattr=full -qlist -qreport -qxref=full -qsource -qsuppress=1506-224:1500-036FLAGS_          = -O3
-FLAGS_LLVN 			= -O3
+FLAGS_LLVM			= -O3
+FLAGS_LLVM_GPU	= -O3
 
 CFLAGS_INTEL     = -O3 -no-prec-div -restrict -fno-alias
 CFLAGS_SUN       = -fast -xipo=2
@@ -90,6 +102,7 @@ CFLAGS_PATHSCALE = -O3
 CFLAGS_XL       = -O5 -qipa=partition=large -g -qfullpath -Q -qlistopt -qattr=full -qlist -qreport -qxref=full -qsource -qsuppress=1506-224:1500-036 -qsrcmsg
 CFLAGS_          = -O3
 CFLAGS_LLVM      = -O3
+CFLAGS_LLVM_GPU  = -O3
 
 ifdef DEBUG
   FLAGS_INTEL     = -O0 -g -debug all -check all -traceback -check noarg_temp_created
@@ -147,6 +160,9 @@ C_MPI_COMPILER_ = CC
 
 MPI_COMPILER_LLVM = flang
 C_MPI_COMPILER_LLVM = clang
+
+MPI_COMPILER_LLVM_GPU = flang
+C_MPI_COMPILER_LLVM_GPU = clang
 
 FLAGS=$(FLAGS_$(COMPILER)) $(OMP) $(I3E) $(OPTIONS)
 CFLAGS=$(CFLAGS_$(COMPILER)) $(OMP) $(I3E) $(C_OPTIONS) -c
