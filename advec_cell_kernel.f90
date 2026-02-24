@@ -72,37 +72,42 @@ CONTAINS
     REAL(KIND=8), DIMENSION(y_min-2:y_max+3) :: vertexdy
 
     INTEGER :: j,k,upwind,donor,downwind,dif
+    INTEGER :: j1, j2, k1, k2
 
     REAL(KIND=8) :: wind,sigma,sigmat,sigmav,sigmam,sigma3,sigma4
     REAL(KIND=8) :: diffuw,diffdw,limiter
     REAL(KIND=8) :: one_by_six=1.0_8/6.0_8
     REAL(KIND=8) :: pre_mass_s,post_mass_s,post_ener_s,advec_vol_s
 
-    !$OMP PARALLEL
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: pre_mass_s_m
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: post_mass_s_m
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: post_ener_s_m
+    REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE :: advec_vol_s_m
+    allocate(pre_mass_s_m(x_max - x_min + 1, y_max - y_min + 1))
+    allocate(post_mass_s_m(x_max - x_min + 1, y_max - y_min + 1))
+    allocate(post_ener_s_m(x_max - x_min + 1, y_max - y_min + 1))
+    allocate(advec_vol_s_m(x_max - x_min + 1, y_max - y_min + 1))
 
     IF(dir.EQ.g_xdir) THEN
-
+      j1 = x_min-2
+      j2 = x_max+2
+      k1 = y_min-2
+      k2 = y_max+2
       IF(sweep_number.EQ.1)THEN
-        !$OMP DO
-        DO k=y_min-2,y_max+2
-          DO j=x_min-2,x_max+2
-            pre_vol(j,k)=volume(j,k)+(vol_flux_x(j+1,k  )-vol_flux_x(j,k)+vol_flux_y(j  ,k+1)-vol_flux_y(j,k))
-            post_vol(j,k)=pre_vol(j,k)-(vol_flux_x(j+1,k  )-vol_flux_x(j,k))
-          ENDDO
-        ENDDO
-      !$OMP END DO
+        !$OMP TEAMS WORKDISTRIBUTE
+          pre_vol(j1:j2,k1:k2)=volume(j1:j2,k1:k2)+(vol_flux_x(j1+1:j2+1,k1:k2)-vol_flux_x(j1:j2,k1:k2)+vol_flux_y(j1:j2,k1+1:k2+1)-vol_flux_y(j1:j2,k1:k2))
+          post_vol(j1:j2,k1:k2)=pre_vol(j1:j2,k1:k2)-(vol_flux_x(j1+1:j2+1,k1:k2)-vol_flux_x(j1:j2,k1:k2))
+        !$OMP END TEAMS WORKDISTRIBUTE
       ELSE
-        !$OMP DO
-        DO k=y_min-2,y_max+2
-          DO j=x_min-2,x_max+2
-            pre_vol(j,k)=volume(j,k)+vol_flux_x(j+1,k)-vol_flux_x(j,k)
-            post_vol(j,k)=volume(j,k)
-          ENDDO
-        ENDDO
-      !$OMP END DO
+        !$OMP TEAMS WORKDISTRIBUTE
+          pre_vol(j1:j2,k1:k2)=volume(j1:j2,k1:k2)+vol_flux_x(j1+1:j2+1,k1:k2)-vol_flux_x(j1:j2,k1:k2)
+          post_vol(j1:j2,k1:k2)=volume(j1:j2,k1:k2)
+        !$OMP END TEAMS WORKDISTRIBUTE
       ENDIF
+    ENDIF
 
-      !$OMP DO PRIVATE(upwind,donor,downwind,dif,sigmat,sigma3,sigma4,sigmav,sigma,sigmam, &
+    IF(dir.EQ.g_xdir) THEN
+      !$OMP PARALLEL DO PRIVATE(upwind,donor,downwind,dif,sigmat,sigma3,sigma4,sigmav,sigma,sigmam, &
       !$OMP            diffuw,diffdw,limiter,wind)
       DO k=y_min,y_max
         DO j=x_min,x_max+2
@@ -154,44 +159,42 @@ CONTAINS
 
         ENDDO
       ENDDO
-      !$OMP END DO
+      !$OMP END PARALLEL DO
+    ENDIF
 
-      !$OMP DO PRIVATE(pre_mass_s,post_mass_s,post_ener_s,advec_vol_s)
-      DO k=y_min,y_max
-        DO j=x_min,x_max
-          pre_mass_s=density1(j,k)*pre_vol(j,k)
-          post_mass_s=pre_mass_s+mass_flux_x(j,k)-mass_flux_x(j+1,k)
-          post_ener_s=(energy1(j,k)*pre_mass_s+ener_flux(j,k)-ener_flux(j+1,k))/post_mass_s
-          advec_vol_s=pre_vol(j,k)+vol_flux_x(j,k)-vol_flux_x(j+1,k)
-          density1(j,k)=post_mass_s/advec_vol_s
-          energy1(j,k)=post_ener_s
-        ENDDO
-      ENDDO
-    !$OMP END DO
+    IF(dir.EQ.g_xdir) THEN
+      j1 = x_min
+      j2 = x_max
+      k1 = y_min
+      k2 = y_max
+      !$OMP TEAMS WORKDISTRIBUTE
+      pre_mass_s_m=density1(j1:j2,k1:k2)*pre_vol(j1:j2,k1:k2)
+      post_mass_s_m=pre_mass_s_m+mass_flux_x(j1:j2,k1:k2)-mass_flux_x(j1+1:j2+1,k1:k2)
+      post_ener_s_m=(energy1(j1:j2,k1:k2)*pre_mass_s_m+ener_flux(j1:j2,k1:k2)-ener_flux(j1+1:j2+1,k1:k2))/post_mass_s_m
+      advec_vol_s_m=pre_vol(j1:j2,k1:k2)+vol_flux_x(j1:j2,k1:k2)-vol_flux_x(j1+1:j2+1,k1:k2)
+      density1(j1:j2,k1:k2)=post_mass_s_m/advec_vol_s_m
+      energy1(j1:j2,k1:k2)=post_ener_s_m
+      !$OMP END TEAMS WORKDISTRIBUTE
 
     ELSEIF(dir.EQ.g_ydir) THEN
 
+      j1 = x_min-2
+      j2 = x_max+2
+      k1 = y_min-2
+      k2 = y_max+2
       IF(sweep_number.EQ.1)THEN
-        !$OMP DO
-        DO k=y_min-2,y_max+2
-          DO j=x_min-2,x_max+2
-            pre_vol(j,k)=volume(j,k)+(vol_flux_y(j  ,k+1)-vol_flux_y(j,k)+vol_flux_x(j+1,k  )-vol_flux_x(j,k))
-            post_vol(j,k)=pre_vol(j,k)-(vol_flux_y(j  ,k+1)-vol_flux_y(j,k))
-          ENDDO
-        ENDDO
-      !$OMP END DO
+        !$OMP TEAMS WORKDISTRIBUTE
+          pre_vol(j1:j2,k1:k2)=volume(j1:j2,k1:k2)+(vol_flux_y(j1:j2,k1+1:k2+1)-vol_flux_y(j1:j2,k1:k2)+vol_flux_x(j1+1:j2+1,k1:k2)-vol_flux_x(j1:j2,k1:k2))
+          post_vol(j1:j2,k1:k2)=pre_vol(j1:j2,k1:k2)-(vol_flux_y(j1:j2,k1+1:k2+1)-vol_flux_y(j1:j2,k1:k2))
+        !$OMP END TEAMS WORKDISTRIBUTE
       ELSE
-        !$OMP DO
-        DO k=y_min-2,y_max+2
-          DO j=x_min-2,x_max+2
-            pre_vol(j,k)=volume(j,k)+vol_flux_y(j  ,k+1)-vol_flux_y(j,k)
-            post_vol(j,k)=volume(j,k)
-          ENDDO
-        ENDDO
-      !$OMP END DO
+        !$OMP TEAMS WORKDISTRIBUTE
+          pre_vol(j1:j2,k1:k2)=volume(j1:j2,k1:k2)+vol_flux_y(j1:j2,k1+1:k2+1)-vol_flux_y(j1:j2,k1:k2)
+          post_vol(j1:j2,k1:k2)=volume(j1:j2,k1:k2)
+        !$OMP END TEAMS WORKDISTRIBUTE
       ENDIF
 
-      !$OMP DO PRIVATE(upwind,donor,downwind,dif,sigmat,sigma3,sigma4,sigmav,sigma,sigmam, &
+      !$OMP PARALLEL DO PRIVATE(upwind,donor,downwind,dif,sigmat,sigma3,sigma4,sigmav,sigma,sigmam, &
       !$OMP            diffuw,diffdw,limiter,wind)
       DO k=y_min,y_max+2
         DO j=x_min,x_max
@@ -242,24 +245,29 @@ CONTAINS
 
         ENDDO
       ENDDO
-      !$OMP END DO
+      !$OMP END PARALLEL DO
 
-      !$OMP DO PRIVATE(pre_mass_s,post_mass_s,post_ener_s,advec_vol_s)
-      DO k=y_min,y_max
-        DO j=x_min,x_max
-          pre_mass_s=density1(j,k)*pre_vol(j,k)
-          post_mass_s=pre_mass_s+mass_flux_y(j,k)-mass_flux_y(j,k+1)
-          post_ener_s=(energy1(j,k)*pre_mass_s+ener_flux(j,k)-ener_flux(j,k+1))/post_mass_s
-          advec_vol_s=pre_vol(j,k)+vol_flux_y(j,k)-vol_flux_y(j,k+1)
-          density1(j,k)=post_mass_s/advec_vol_s
-          energy1(j,k)=post_ener_s
-        ENDDO
-      ENDDO
-    !$OMP END DO
+       j1 = x_min-2
+       j2 = x_max+2
+       k1 = y_min-2
+       k2 = y_max+2
+       !$OMP TEAMS WORKDISTRIBUTE 
+          pre_mass_s_m=density1(j1:j2,k1:k2)*pre_vol(j1:j2,k1:k2)
+          post_mass_s_m=pre_mass_s_m+mass_flux_y(j1:j2,k1:k2)-mass_flux_y(j1:j2,k1+1:k2+1)
+          post_ener_s_m=(energy1(j1:j2,k1:k2)*pre_mass_s_m+ener_flux(j1:j2,k1:k2)-ener_flux(j1:j2,k1+1:k2+1))/post_mass_s_m
+          advec_vol_s_m=pre_vol(j1:j2,k1:k2)+vol_flux_y(j1:j2,k1:k2)-vol_flux_y(j1:j2,k1+1:k2+1)
+          density1(j1:j2,k1:k2)=post_mass_s_m/advec_vol_s_m
+          energy1(j1:j2,k1:k2)=post_ener_s_m
+       !$OMP END TEAMS WORKDISTRIBUTE 
 
     ENDIF
 
-  !$OMP END PARALLEL
+    deallocate(pre_mass_s_m)
+    deallocate(post_mass_s_m)
+    deallocate(post_ener_s_m)
+    deallocate(advec_vol_s_m)
+
+
 
   END SUBROUTINE advec_cell_kernel
 
