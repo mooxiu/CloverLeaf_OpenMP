@@ -246,5 +246,14 @@ clean:
 .PHONY: run
 run: 
 	LD_LIBRARY_PATH=~/opt/llvm-project/release/install/lib/x86_64-unknown-linux-gnu ./clover_leaf
-	mv ./clover.in.tmp ./outputs/clover.in.tmp 
-	mv ./clover.out ./outputs/clover.out
+	mv ./clover.in.tmp ./outputs/clover.$(shell date +%s).in.tmp 
+	mv ./clover.out ./outputs/clover.$(shell date +%s).out
+
+run_%: ./InputDecks/%.in
+	cp ./clover.in ./clover.in_bk
+	cp $< ./clover.in
+	LD_LIBRARY_PATH=~/opt/llvm-project/release/install/lib/x86_64-unknown-linux-gnu ./clover_leaf
+	mv ./clover.in.tmp ./outputs/clover.$(shell date +%s).in.tmp 
+	mv ./clover.out ./outputs/clover.$(shell date +%s).out
+	cp ./clover.in_bk ./clover.in
+	
