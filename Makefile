@@ -69,7 +69,7 @@ OMP_CRAY      =
 OMP_PGI       = -mp=nonuma
 OMP_PATHSCALE = -mp
 OMP_XL        = -qsmp=omp -qthreaded
-OMP_LLVM 			= -fopenmp
+OMP_LLVM 			= -fopenmp -fopenmp-version=60
 OMP=$(OMP_$(COMPILER))
 
 FLAGS_INTEL     = -O3 -no-prec-div
