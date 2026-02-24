@@ -94,15 +94,19 @@ CONTAINS
       k1 = y_min-2
       k2 = y_max+2
       IF(sweep_number.EQ.1)THEN
-        !$OMP TEAMS WORKDISTRIBUTE
+        !$OMP TARGET DATA MAP(tofrom:pre_vol,volume,vol_flux_x,vol_flux_y)
+        !$OMP TARGET TEAMS WORKDISTRIBUTE
           pre_vol(j1:j2,k1:k2)=volume(j1:j2,k1:k2)+(vol_flux_x(j1+1:j2+1,k1:k2)-vol_flux_x(j1:j2,k1:k2)+vol_flux_y(j1:j2,k1+1:k2+1)-vol_flux_y(j1:j2,k1:k2))
           post_vol(j1:j2,k1:k2)=pre_vol(j1:j2,k1:k2)-(vol_flux_x(j1+1:j2+1,k1:k2)-vol_flux_x(j1:j2,k1:k2))
-        !$OMP END TEAMS WORKDISTRIBUTE
+        !$OMP END TARGET TEAMS WORKDISTRIBUTE
+        !$OMP END TARGET DATA
       ELSE
-        !$OMP TEAMS WORKDISTRIBUTE
+        !$OMP TARGET DATA MAP(tofrom:pre_vol,volume,vol_flux_x,vol_flux_y)
+        !$OMP TARGET TEAMS WORKDISTRIBUTE
           pre_vol(j1:j2,k1:k2)=volume(j1:j2,k1:k2)+vol_flux_x(j1+1:j2+1,k1:k2)-vol_flux_x(j1:j2,k1:k2)
           post_vol(j1:j2,k1:k2)=volume(j1:j2,k1:k2)
-        !$OMP END TEAMS WORKDISTRIBUTE
+        !$OMP END TARGET TEAMS WORKDISTRIBUTE
+        !$OMP END TARGET DATA
       ENDIF
     ENDIF
 
@@ -167,14 +171,16 @@ CONTAINS
       j2 = x_max
       k1 = y_min
       k2 = y_max
-      !$OMP TEAMS WORKDISTRIBUTE
+      !$OMP TARGET DATA MAP(tofrom:pre_mass_s_m,density1,pre_vol,post_mass_s_m,mass_flux_x,post_ener_s_m,ener_flux,advec_vol_s_m,vol_flux_x)
+      !$OMP TARGET TEAMS WORKDISTRIBUTE
       pre_mass_s_m=density1(j1:j2,k1:k2)*pre_vol(j1:j2,k1:k2)
       post_mass_s_m=pre_mass_s_m+mass_flux_x(j1:j2,k1:k2)-mass_flux_x(j1+1:j2+1,k1:k2)
       post_ener_s_m=(energy1(j1:j2,k1:k2)*pre_mass_s_m+ener_flux(j1:j2,k1:k2)-ener_flux(j1+1:j2+1,k1:k2))/post_mass_s_m
       advec_vol_s_m=pre_vol(j1:j2,k1:k2)+vol_flux_x(j1:j2,k1:k2)-vol_flux_x(j1+1:j2+1,k1:k2)
       density1(j1:j2,k1:k2)=post_mass_s_m/advec_vol_s_m
       energy1(j1:j2,k1:k2)=post_ener_s_m
-      !$OMP END TEAMS WORKDISTRIBUTE
+      !$OMP END TARGET TEAMS WORKDISTRIBUTE
+      !$OMP END TARGET DATA 
 
     ELSEIF(dir.EQ.g_ydir) THEN
 
@@ -183,15 +189,19 @@ CONTAINS
       k1 = y_min-2
       k2 = y_max+2
       IF(sweep_number.EQ.1)THEN
-        !$OMP TEAMS WORKDISTRIBUTE
+        !$OMP TARGET DATA MAP(tofrom:pre_vol,volume,vol_flux_x,vol_flux_y)
+        !$OMP TARGET TEAMS WORKDISTRIBUTE
           pre_vol(j1:j2,k1:k2)=volume(j1:j2,k1:k2)+(vol_flux_y(j1:j2,k1+1:k2+1)-vol_flux_y(j1:j2,k1:k2)+vol_flux_x(j1+1:j2+1,k1:k2)-vol_flux_x(j1:j2,k1:k2))
           post_vol(j1:j2,k1:k2)=pre_vol(j1:j2,k1:k2)-(vol_flux_y(j1:j2,k1+1:k2+1)-vol_flux_y(j1:j2,k1:k2))
-        !$OMP END TEAMS WORKDISTRIBUTE
+        !$OMP END TARGET TEAMS WORKDISTRIBUTE
+        !$OMP END TARGET DATA
       ELSE
-        !$OMP TEAMS WORKDISTRIBUTE
+        !$OMP TARGET DATA MAP(tofrom:pre_vol,volume,vol_flux_x,vol_flux_y)
+        !$OMP TARGET TEAMS WORKDISTRIBUTE
           pre_vol(j1:j2,k1:k2)=volume(j1:j2,k1:k2)+vol_flux_y(j1:j2,k1+1:k2+1)-vol_flux_y(j1:j2,k1:k2)
           post_vol(j1:j2,k1:k2)=volume(j1:j2,k1:k2)
-        !$OMP END TEAMS WORKDISTRIBUTE
+        !$OMP END TARGET TEAMS WORKDISTRIBUTE
+        !$OMP END TARGET DATA
       ENDIF
 
       !$OMP PARALLEL DO PRIVATE(upwind,donor,downwind,dif,sigmat,sigma3,sigma4,sigmav,sigma,sigmam, &
@@ -251,15 +261,16 @@ CONTAINS
        j2 = x_max+2
        k1 = y_min-2
        k2 = y_max+2
-       !$OMP TEAMS WORKDISTRIBUTE 
+       !$OMP TARGET DATA MAP(tofrom:pre_mass_s_m,density1,pre_vol,post_mass_s_m,mass_flux_x,post_ener_s_m,ener_flux,advec_vol_s_m,vol_flux_x)
+       !$OMP TARGET TEAMS WORKDISTRIBUTE 
           pre_mass_s_m=density1(j1:j2,k1:k2)*pre_vol(j1:j2,k1:k2)
           post_mass_s_m=pre_mass_s_m+mass_flux_y(j1:j2,k1:k2)-mass_flux_y(j1:j2,k1+1:k2+1)
           post_ener_s_m=(energy1(j1:j2,k1:k2)*pre_mass_s_m+ener_flux(j1:j2,k1:k2)-ener_flux(j1:j2,k1+1:k2+1))/post_mass_s_m
           advec_vol_s_m=pre_vol(j1:j2,k1:k2)+vol_flux_y(j1:j2,k1:k2)-vol_flux_y(j1:j2,k1+1:k2+1)
           density1(j1:j2,k1:k2)=post_mass_s_m/advec_vol_s_m
           energy1(j1:j2,k1:k2)=post_ener_s_m
-       !$OMP END TEAMS WORKDISTRIBUTE 
-
+       !$OMP END TARGET TEAMS WORKDISTRIBUTE 
+       !$OMP END TARGET DATA
     ENDIF
 
     deallocate(pre_mass_s_m)
