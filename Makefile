@@ -242,3 +242,9 @@ c_lover: *.c Makefile
 
 clean:
 	rm -f *.o *.mod *genmod* *cuda* *hmd* *.cu *.oo *.hmf *.lst *.cub *.ptx *.cl clover_leaf
+
+.PHONY: run
+run: 
+	LD_LIBRARY_PATH=~/opt/llvm-project/release/install/lib/x86_64-unknown-linux-gnu ./clover_leaf
+	mv ./clover.in.tmp ./outputs/clover.in.tmp 
+	mv ./clover.out ./outputs/clover.out
